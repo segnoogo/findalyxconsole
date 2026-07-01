@@ -152,6 +152,11 @@ tr:hover td{background:#f7faff}
 .ava{width:30px;height:30px;border-radius:50%;flex:none;background:linear-gradient(135deg,#e3ebf8,#d3e0f4);color:var(--navy);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1px solid #d7e1f2}
 .cli{font-weight:700;color:var(--navy)}
 .cli small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:1px}
+.who.editable{cursor:pointer;border-radius:8px;padding:2px 4px;margin:-2px -4px;transition:background .12s}
+.who.editable:hover{background:#eef3fb}
+.who.editable:hover .cli{text-decoration:underline;text-decoration-color:var(--orange)}
+.who.editable .cli::after{content:"✎";font-size:11px;color:var(--muted-2);margin-left:6px;opacity:0;transition:opacity .12s}
+.who.editable:hover .cli::after{opacity:1}
 td.em a{color:var(--blue);text-decoration:none;font-weight:500}
 td.em a:hover{text-decoration:underline}
 .code{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:11.5px;font-weight:600;background:#eef3fb;color:var(--blue);padding:3px 7px;border-radius:6px;cursor:pointer;border:1px solid #e0e8f5;display:inline-block}
@@ -169,6 +174,22 @@ td.em a:hover{text-decoration:underline}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.bad{background:var(--bad)}
 .toast.ok{background:var(--ok)}
+
+/* ---------- Modale d'édition ---------- */
+.modal-scrim{position:fixed;inset:0;background:rgba(15,28,63,.5);display:none;align-items:center;justify-content:center;padding:20px;z-index:70;opacity:0;transition:opacity .2s}
+.modal-scrim.show{display:flex;opacity:1}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);width:100%;max-width:560px;max-height:92vh;overflow:auto;box-shadow:var(--shadow);transform:translateY(12px);transition:transform .2s}
+.modal-scrim.show .modal{transform:none}
+.modal-head{display:flex;align-items:center;gap:10px;padding:20px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:1}
+.modal-head h2{margin:0}
+.modal-close{margin-left:auto;background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--muted);padding:2px 8px;border-radius:8px}
+.modal-close:hover{background:#f1f5fb;color:var(--navy)}
+.modal-body{padding:8px 24px 20px}
+.modal-foot{display:flex;align-items:center;gap:12px;padding:16px 24px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface)}
+.modal-foot .btn:last-child{margin-left:auto}
+select{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;color:var(--ink);background:#fff;transition:border-color .15s,box-shadow .15s}
+select:hover{border-color:#cdd7e8}
+select:focus{outline:none;border-color:var(--blue-soft);box-shadow:0 0 0 4px var(--ring)}
 
 /* ---------- Responsive ---------- */
 @media(max-width:900px){
@@ -276,6 +297,34 @@ td.em a:hover{text-decoration:underline}
 </div>
 
 <div id="toast" class="toast"></div>
+
+<!-- MODALE D'ÉDITION CLIENT -->
+<div id="editScrim" class="modal-scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="modal-head">
+      <h2 id="editTitle">Modifier le client</h2>
+      <button class="modal-close" id="editClose" aria-label="Fermer">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="formgrid">
+        <div><label>Pr&eacute;nom *</label><input id="ePrenom" placeholder="Ex. Awa"></div>
+        <div><label>Nom *</label><input id="eNom" placeholder="Ex. Ndiaye"></div>
+        <div><label>Email *</label><input id="eEmail" type="email" placeholder="Ex. awa.ndiaye@email.com"></div>
+        <div><label>Entreprise (optionnel)</label><input id="eEntreprise" placeholder="Ex. Cabinet Diallo"></div>
+        <div><label>T&eacute;l&eacute;phone (optionnel)</label><input id="eContact" placeholder="Ex. +221 77 000 00 00"></div>
+        <div><label>Date d'expiration</label><input id="eExp" type="date"></div>
+        <div><label>Appareils autoris&eacute;s</label><input id="eMax" type="number" min="1"></div>
+        <div><label>Statut</label><select id="eStatut"><option value="actif">Actif</option><option value="suspendu">Suspendu</option></select></div>
+      </div>
+      <p class="hint">Code de licence : <span id="eCle" class="code"></span></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="editCancel">Annuler</button>
+      <button class="btn primary" id="editSave">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 
 var FUNC_URL="https://dddrgmxkywjxxycfoiya.supabase.co/functions/v1/gerer-licences";
@@ -415,7 +464,7 @@ function renderTable(){
     var actif=(r.statut==="actif");
     var sub=esc(r.entreprise||"");
     h+='<tr>'+
-      '<td><div class="who"><span class="ava">'+esc(initials(r))+'</span><span class="cli">'+esc(fullName(r))+(sub?'<small>'+sub+'</small>':'')+'</span></div></td>'+
+      '<td><div class="who editable" data-edit="'+esc(r.cle)+'" title="Cliquer pour modifier ce client"><span class="ava">'+esc(initials(r))+'</span><span class="cli">'+esc(fullName(r))+(sub?'<small>'+sub+'</small>':'')+'</span></div></td>'+
       '<td class="em">'+(r.email?'<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>':"—")+'</td>'+
       '<td><span class="code" data-copy="'+esc(r.cle)+'" title="Cliquer pour copier">'+esc(r.cle)+'</span></td>'+
       '<td><span class="pill '+cls+'">'+st+'</span></td>'+
@@ -480,6 +529,43 @@ async function createClient(){
   $("createBtn").disabled=false;
 }
 
+// --- Édition d'un client ---
+var EDIT_CLE=null;
+function openEdit(cle){
+  var r=rowByCle(cle); if(!r) return;
+  EDIT_CLE=cle;
+  $("ePrenom").value=r.prenom||"";
+  $("eNom").value=r.nom||"";
+  $("eEmail").value=r.email||"";
+  $("eEntreprise").value=r.entreprise||"";
+  $("eContact").value=r.contact||"";
+  $("eExp").value=r.expire_le||"";
+  $("eMax").value=(r.max_appareils!=null?r.max_appareils:2);
+  $("eStatut").value=(r.statut==="actif"?"actif":"suspendu");
+  $("eCle").textContent=cle;
+  $("editScrim").classList.add("show");
+  try{ $("ePrenom").focus(); }catch(e){}
+}
+function closeEdit(){ $("editScrim").classList.remove("show"); EDIT_CLE=null; }
+async function saveEdit(){
+  if(!EDIT_CLE) return;
+  var prenom=$("ePrenom").value.trim(), nom=$("eNom").value.trim(), email=$("eEmail").value.trim(),
+      entreprise=$("eEntreprise").value.trim(), contact=$("eContact").value.trim(),
+      exp=$("eExp").value, max=parseInt($("eMax").value,10)||2, statut=$("eStatut").value;
+  if(!prenom||!nom){ toast("Indique le prénom et le nom","bad"); return; }
+  if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast("Saisis un email valide","bad"); return; }
+  if(!exp){ toast("Choisis une date d'expiration","bad"); return; }
+  var client=entreprise||((prenom+" "+nom).trim());
+  $("editSave").disabled=true;
+  try{
+    await api("update",{cle:EDIT_CLE, client:client, prenom:prenom, nom:nom, email:email, entreprise:entreprise, contact:contact, expire_le:exp, max_appareils:max, statut:statut});
+    toast("Client mis à jour","ok");
+    closeEdit();
+    await loadList();
+  }catch(e){ toast("Erreur : "+e.message,"bad"); }
+  $("editSave").disabled=false;
+}
+
 function copy(txt){
   try{ navigator.clipboard.writeText(txt).then(function(){ toast("Code copié : "+txt,"ok"); }, function(){ fallbackCopy(txt); }); }
   catch(e){ fallbackCopy(txt); }
@@ -494,8 +580,16 @@ $("refreshBtn").onclick=loadList;
 $("search").addEventListener("input",function(){ var lv=document.getElementById("view-licences"); if(lv&&lv.hidden){ switchView("licences"); } renderTable(); });
 $("tableWrap").addEventListener("click",function(e){
   var c=e.target.closest("[data-copy]"); if(c){ copy(c.getAttribute("data-copy")); return; }
+  var ed=e.target.closest("[data-edit]"); if(ed){ openEdit(ed.getAttribute("data-edit")); return; }
   var b=e.target.closest("[data-act]"); if(b){ doAction(b.getAttribute("data-act"), b.getAttribute("data-cle")); }
 });
+
+// Modale d'édition : boutons et fermeture
+$("editSave").onclick=saveEdit;
+$("editCancel").onclick=closeEdit;
+$("editClose").onclick=closeEdit;
+$("editScrim").addEventListener("click",function(e){ if(e.target===this) closeEdit(); });
+document.addEventListener("keydown",function(e){ if(e.key==="Escape" && $("editScrim").classList.contains("show")) closeEdit(); });
 
 (function(){
   $("nExp").value=plusYears(null,1);
