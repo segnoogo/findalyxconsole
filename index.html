@@ -144,6 +144,9 @@ input:focus{outline:none;border-color:var(--blue-soft);box-shadow:0 0 0 4px var(
 table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:720px}
 thead th{position:sticky;top:0;background:#f7f9fd;z-index:1}
 th{text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;padding:11px 14px;border-bottom:1px solid var(--line)}
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--navy)}
+th.sortable .ar{color:var(--orange);font-size:9px;margin-left:3px}
 td{padding:11px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
 tbody tr{transition:background .12s}
 tbody tr:last-child td{border-bottom:none}
@@ -187,6 +190,13 @@ td.em a:hover{text-decoration:underline}
 .modal-body{padding:8px 24px 20px}
 .modal-foot{display:flex;align-items:center;gap:12px;padding:16px 24px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface)}
 .modal-foot .btn:last-child{margin-left:auto}
+#eSocBox{margin-top:14px}
+.soclist{border:1px solid var(--line);border-radius:var(--radius-sm);max-height:180px;overflow:auto;background:#fbfcfe}
+.soclist .socrow{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line-soft);font-size:13px;color:var(--ink)}
+.soclist .socrow:last-child{border-bottom:none}
+.soclist .socrow .sic{width:22px;height:22px;border-radius:6px;background:#eef3fb;color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none}
+.soclist .socrow small{color:var(--muted);font-size:11px;margin-left:auto;font-family:ui-monospace,Consolas,monospace}
+.soclist .msg{padding:12px;color:var(--muted);font-size:13px;text-align:center}
 select{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;color:var(--ink);background:#fff;transition:border-color .15s,box-shadow .15s}
 select:hover{border-color:#cdd7e8}
 select:focus{outline:none;border-color:var(--blue-soft);box-shadow:0 0 0 4px var(--ring)}
@@ -298,6 +308,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
               <option value="susp">Suspendues</option>
             </select>
             <button id="newBtn" class="btn primary" data-view="create">+ Nouveau client</button>
+            <button id="exportBtn" class="btn" title="Exporter la liste affichée en CSV">Exporter CSV</button>
             <button id="refreshBtn" class="btn">Actualiser</button>
           </div>
           <div id="tableWrap"><div class="empty">Chargement&hellip;</div></div>
@@ -314,7 +325,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
 <div id="editScrim" class="modal-scrim">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
     <div class="modal-head">
-      <h2 id="editTitle">Modifier le client</h2>
+      <h2 id="editTitle">Fiche client</h2>
       <button class="modal-close" id="editClose" aria-label="Fermer">&times;</button>
     </div>
     <div class="modal-body">
@@ -329,7 +340,11 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
         <div><label>Soci&eacute;t&eacute;s autoris&eacute;es</label><input id="eSoc" type="number" min="0" title="0 = illimit&eacute;"></div>
         <div><label>Statut</label><select id="eStatut"><option value="actif">Actif</option><option value="resilie">Suspendu</option></select></div>
       </div>
-      <p class="hint">Code de licence : <span id="eCle" class="code"></span></p>
+      <p class="hint">Code de licence : <span id="eCle" class="code" title="Cliquer pour copier"></span></p>
+      <div id="eSocBox">
+        <label>Soci&eacute;t&eacute;s enregistr&eacute;es (<span id="eSocCount">0</span>)</label>
+        <div id="eSocList" class="soclist"></div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn" id="editCancel">Annuler</button>
@@ -391,14 +406,14 @@ async function loadList(){
 }
 
 function renderStats(){
-  var tot=ROWS.length, act=0, exp=0, soon=0;
+  var tot=ROWS.length, act=0, exp=0, soon=0, dev=0;
   ROWS.forEach(function(r){
-    var dl=daysLeft(r.expire_le); var actif=(r.statut==="actif");
-    if(actif && dl!=null && dl>=0) act++;
-    if(dl!=null && dl<0) exp++;
-    else if(actif && dl!=null && dl<=30) soon++;
+    var k=licStatus(r).key;               // même classification que le tableau de bord
+    if(k==="ok"||k==="soon") act++;        // actives = utilisables (non expirées, non suspendues)
+    if(k==="soon") soon++;
+    if(k==="exp") exp++;
+    dev+=Array.isArray(r.appareils)?r.appareils.length:0;
   });
-  var dev=0; ROWS.forEach(function(r){ dev+=Array.isArray(r.appareils)?r.appareils.length:0; });
   var pct=function(x){ return tot?(Math.round(x/tot*100)+" % du total"):"—"; };
   $("stats").innerHTML=
     stat(tot,"Licences au total",IC_LIST,"t-navy", dev+" appareil"+(dev>1?"s":"")+" actif"+(dev>1?"s":""),"mut")+
@@ -475,6 +490,20 @@ function renderDashboard(){
 
 function initials(r){ var a=(r.prenom||"").trim(), b=(r.nom||"").trim(); var s=((a?a[0]:"")+(b?b[0]:"")).toUpperCase(); if(!s){ var c=String(r.client||r.entreprise||"?").trim(); s=c?c[0].toUpperCase():"?"; } return s||"?"; }
 function fullName(r){ var n=((r.prenom||"")+" "+(r.nom||"")).trim(); return n||r.client||"—"; }
+
+// Tri du tableau
+var SORT={key:null,dir:1}, VIEW_ROWS=[];
+function sortVal(r,key){
+  switch(key){
+    case "client": return fullName(r).toLowerCase();
+    case "code": return String(r.cle||"").toLowerCase();
+    case "statut": return ({ok:0,soon:1,exp:2,susp:3})[licStatus(r).key];
+    case "jours": var dl=daysLeft(r.expire_le); return dl==null?1e9:dl;
+    case "appareils": return Array.isArray(r.appareils)?r.appareils.length:0;
+    case "societes": return r.societes_utilisees!=null?r.societes_utilisees:0;
+  }
+  return "";
+}
 function renderTable(){
   var q=($("search").value||"").toLowerCase().trim();
   var ft=($("filterType")&&$("filterType").value)||"all";
@@ -483,8 +512,19 @@ function renderTable(){
     if(!q) return true;
     return (String(r.prenom||"")+" "+String(r.nom||"")+" "+String(r.entreprise||"")+" "+String(r.email||"")+" "+String(r.client||"")+" "+String(r.cle||"")).toLowerCase().indexOf(q)>=0;
   });
-  if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+((q||ft!=="all")?" pour ce filtre":"")+'.</div>'; return; }
-  var h='<table><thead><tr><th>Client</th><th>Code</th><th>Statut</th><th>Jours</th><th>Appareils</th><th>Sociétés</th><th>Actions</th></tr></thead><tbody>';
+  if(SORT.key){ list.sort(function(a,b){ var va=sortVal(a,SORT.key), vb=sortVal(b,SORT.key); if(va<vb) return -SORT.dir; if(va>vb) return SORT.dir; return 0; }); }
+  VIEW_ROWS=list;
+  var filtered=(q||ft!=="all");
+  var lc=$("licCnt"); if(lc) lc.textContent=filtered?(list.length+" / "+ROWS.length):ROWS.length;
+  if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+(filtered?" pour ce filtre":"")+'.</div>'; return; }
+  var cols=[["client","Client"],["code","Code"],["statut","Statut"],["jours","Jours"],["appareils","Appareils"],["societes","Sociétés"]];
+  var thead="";
+  cols.forEach(function(c){
+    var ar=(SORT.key===c[0])?'<span class="ar">'+(SORT.dir>0?"▲":"▼")+'</span>':"";
+    thead+='<th class="sortable" data-sort="'+c[0]+'" title="Trier">'+c[1]+ar+'</th>';
+  });
+  thead+='<th>Actions</th>';
+  var h='<table><thead><tr>'+thead+'</tr></thead><tbody>';
   list.forEach(function(r){
     var dl=daysLeft(r.expire_le);
     var st, cls;
@@ -517,8 +557,11 @@ function renderTable(){
 
 function rowByCle(cle){ for(var i=0;i<ROWS.length;i++){ if(ROWS[i].cle===cle) return ROWS[i]; } return null; }
 
+var ACTING=false;
 async function doAction(act,cle){
+  if(ACTING) return;               // évite les doubles clics (ex. double renouvellement)
   var r=rowByCle(cle); if(!r) return;
+  ACTING=true;
   try{
     if(act==="renew"){
       var base=(r.expire_le && r.expire_le>today())?r.expire_le:today();
@@ -548,6 +591,7 @@ async function doAction(act,cle){
     }
     await loadList();
   }catch(e){ toast("Erreur : "+e.message,"bad"); }
+  finally{ ACTING=false; }
 }
 
 async function createClient(){
@@ -587,7 +631,32 @@ function openEdit(cle){
   $("eStatut").value=(r.statut==="actif"?"actif":"resilie");
   $("eCle").textContent=cle;
   $("editScrim").classList.add("show");
+  loadSocietes(cle, r);
   try{ $("ePrenom").focus(); }catch(e){}
+}
+function socInitial(s){ var t=String((s&&s.libelle)||(s&&s.societe_id)||"?").trim(); return t?t[0].toUpperCase():"?"; }
+function loadSocietes(cle, r){
+  var box=$("eSocList"), cnt=$("eSocCount");
+  box.innerHTML='<div class="msg">Chargement…</div>';
+  cnt.textContent=(r&&r.societes_utilisees!=null)?r.societes_utilisees:"…";
+  api("list_societes",{cle:cle}).then(function(list){
+    if(EDIT_CLE!==cle) return;           // la fiche a changé entre-temps
+    list=list||[];
+    cnt.textContent=list.length;
+    if(!list.length){ box.innerHTML='<div class="msg">Aucune société enregistrée pour le moment.</div>'; return; }
+    box.innerHTML=list.map(function(s){
+      var nom=esc((s&&s.libelle)||"") || '<span class="muted">(sans nom)</span>';
+      var id=(s&&s.societe_id)?'<small title="Identifiant société">'+esc(s.societe_id)+'</small>':'';
+      return '<div class="socrow"><span class="sic">'+esc(socInitial(s))+'</span><span>'+nom+'</span>'+id+'</div>';
+    }).join('');
+  }).catch(function(e){
+    if(EDIT_CLE!==cle) return;
+    if(e.raison==="action_inconnue"){
+      box.innerHTML='<div class="msg">Fonctionnalité à activer : ajoute l\'action <b>list_societes</b> à la fonction serveur <b>gerer-licences</b>.</div>';
+    } else {
+      box.innerHTML='<div class="msg">Erreur : '+esc(e.message)+'</div>';
+    }
+  });
 }
 function closeEdit(){ $("editScrim").classList.remove("show"); EDIT_CLE=null; }
 async function saveEdit(){
@@ -616,14 +685,44 @@ function copy(txt){
 }
 function fallbackCopy(txt){ var i=document.createElement("input"); i.value=txt; document.body.appendChild(i); i.select(); try{ document.execCommand("copy"); toast("Code copié : "+txt,"ok"); }catch(e){ toast(txt); } document.body.removeChild(i); }
 
+// --- Export CSV (liste actuellement affichée : filtre + recherche + tri) ---
+function csvCell(v){ v=String(v==null?"":v); return /[";\n\r]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; }
+function exportCSV(){
+  var rows=VIEW_ROWS||[];
+  if(!rows.length){ toast("Rien à exporter","bad"); return; }
+  var head=["Prénom","Nom","Entreprise","Email","Téléphone","Code","Statut","Expire le","Jours restants","Appareils utilisés","Appareils max","Sociétés utilisées","Sociétés max"];
+  var lib={ok:"Actif",soon:"Expire bientôt",exp:"Expiré",susp:"Suspendu"};
+  var lines=[head.map(csvCell).join(";")];
+  rows.forEach(function(r){
+    var dl=daysLeft(r.expire_le);
+    lines.push([
+      r.prenom, r.nom, r.entreprise, r.email, r.contact, r.cle,
+      (lib[licStatus(r).key]||""), r.expire_le, (dl==null?"":dl),
+      (Array.isArray(r.appareils)?r.appareils.length:0), (r.max_appareils!=null?r.max_appareils:2),
+      (r.societes_utilisees!=null?r.societes_utilisees:0), (r.max_societes!=null?r.max_societes:1)
+    ].map(csvCell).join(";"));
+  });
+  var csv="﻿"+lines.join("\r\n");   // BOM pour les accents dans Excel
+  try{
+    var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a"); a.href=url; a.download="licences-findalyx-"+today()+".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+    toast("Export CSV : "+rows.length+" ligne"+(rows.length>1?"s":""),"ok");
+  }catch(e){ toast("Export impossible : "+e.message,"bad"); }
+}
+
 $("connBtn").onclick=connect;
 $("cPass").addEventListener("keydown",function(e){ if(e.key==="Enter") connect(); });
 $("createBtn").onclick=createClient;
 $("refreshBtn").onclick=loadList;
+$("exportBtn").onclick=exportCSV;
 
 $("search").addEventListener("input",function(){ var lv=document.getElementById("view-licences"); if(lv&&lv.hidden){ switchView("licences"); } renderTable(); });
 $("filterType").addEventListener("change",renderTable);
 $("tableWrap").addEventListener("click",function(e){
+  var so=e.target.closest("[data-sort]"); if(so){ var k=so.getAttribute("data-sort"); if(SORT.key===k){ SORT.dir=-SORT.dir; } else { SORT.key=k; SORT.dir=1; } renderTable(); return; }
   var c=e.target.closest("[data-copy]"); if(c){ copy(c.getAttribute("data-copy")); return; }
   var ed=e.target.closest("[data-edit]"); if(ed){ openEdit(ed.getAttribute("data-edit")); return; }
   var b=e.target.closest("[data-act]"); if(b){ doAction(b.getAttribute("data-act"), b.getAttribute("data-cle")); }
@@ -633,6 +732,9 @@ $("tableWrap").addEventListener("click",function(e){
 $("editSave").onclick=saveEdit;
 $("editCancel").onclick=closeEdit;
 $("editClose").onclick=closeEdit;
+$("eCle").onclick=function(){ if(this.textContent) copy(this.textContent); };
+// Entrée dans un champ = Enregistrer (raccourci pratique)
+$("editScrim").addEventListener("keydown",function(e){ if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); saveEdit(); } });
 // Volontairement : un clic à côté (sur le fond) NE ferme PAS la modale,
 // pour ne pas perdre la saisie. On ferme uniquement via ×, Annuler ou Échap.
 document.addEventListener("keydown",function(e){ if(e.key==="Escape" && $("editScrim").classList.contains("show")) closeEdit(); });
