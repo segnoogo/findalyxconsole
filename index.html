@@ -314,7 +314,7 @@ select:focus{outline:none;border-color:var(--blue-soft);box-shadow:0 0 0 4px var
         <div><label>T&eacute;l&eacute;phone (optionnel)</label><input id="eContact" placeholder="Ex. +221 77 000 00 00"></div>
         <div><label>Date d'expiration</label><input id="eExp" type="date"></div>
         <div><label>Appareils autoris&eacute;s</label><input id="eMax" type="number" min="1"></div>
-        <div><label>Statut</label><select id="eStatut"><option value="actif">Actif</option><option value="suspendu">Suspendu</option></select></div>
+        <div><label>Statut</label><select id="eStatut"><option value="actif">Actif</option><option value="resilie">Suspendu</option></select></div>
       </div>
       <p class="hint">Code de licence : <span id="eCle" class="code"></span></p>
     </div>
@@ -541,7 +541,7 @@ function openEdit(cle){
   $("eContact").value=r.contact||"";
   $("eExp").value=r.expire_le||"";
   $("eMax").value=(r.max_appareils!=null?r.max_appareils:2);
-  $("eStatut").value=(r.statut==="actif"?"actif":"suspendu");
+  $("eStatut").value=(r.statut==="actif"?"actif":"resilie");
   $("eCle").textContent=cle;
   $("editScrim").classList.add("show");
   try{ $("ePrenom").focus(); }catch(e){}
