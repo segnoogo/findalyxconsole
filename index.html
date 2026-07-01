@@ -329,7 +329,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
         <div><label>Soci&eacute;t&eacute;s autoris&eacute;es</label><input id="eSoc" type="number" min="0" title="0 = illimit&eacute;"></div>
         <div><label>Statut</label><select id="eStatut"><option value="actif">Actif</option><option value="resilie">Suspendu</option></select></div>
       </div>
-      <p class="hint">Code de licence : <span id="eCle" class="code"></span></p>
+      <p class="hint">Code de licence : <span id="eCle" class="code" title="Cliquer pour copier"></span></p>
     </div>
     <div class="modal-foot">
       <button class="btn" id="editCancel">Annuler</button>
@@ -391,14 +391,14 @@ async function loadList(){
 }
 
 function renderStats(){
-  var tot=ROWS.length, act=0, exp=0, soon=0;
+  var tot=ROWS.length, act=0, exp=0, soon=0, dev=0;
   ROWS.forEach(function(r){
-    var dl=daysLeft(r.expire_le); var actif=(r.statut==="actif");
-    if(actif && dl!=null && dl>=0) act++;
-    if(dl!=null && dl<0) exp++;
-    else if(actif && dl!=null && dl<=30) soon++;
+    var k=licStatus(r).key;               // même classification que le tableau de bord
+    if(k==="ok"||k==="soon") act++;        // actives = utilisables (non expirées, non suspendues)
+    if(k==="soon") soon++;
+    if(k==="exp") exp++;
+    dev+=Array.isArray(r.appareils)?r.appareils.length:0;
   });
-  var dev=0; ROWS.forEach(function(r){ dev+=Array.isArray(r.appareils)?r.appareils.length:0; });
   var pct=function(x){ return tot?(Math.round(x/tot*100)+" % du total"):"—"; };
   $("stats").innerHTML=
     stat(tot,"Licences au total",IC_LIST,"t-navy", dev+" appareil"+(dev>1?"s":"")+" actif"+(dev>1?"s":""),"mut")+
@@ -483,7 +483,9 @@ function renderTable(){
     if(!q) return true;
     return (String(r.prenom||"")+" "+String(r.nom||"")+" "+String(r.entreprise||"")+" "+String(r.email||"")+" "+String(r.client||"")+" "+String(r.cle||"")).toLowerCase().indexOf(q)>=0;
   });
-  if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+((q||ft!=="all")?" pour ce filtre":"")+'.</div>'; return; }
+  var filtered=(q||ft!=="all");
+  var lc=$("licCnt"); if(lc) lc.textContent=filtered?(list.length+" / "+ROWS.length):ROWS.length;
+  if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+(filtered?" pour ce filtre":"")+'.</div>'; return; }
   var h='<table><thead><tr><th>Client</th><th>Code</th><th>Statut</th><th>Jours</th><th>Appareils</th><th>Sociétés</th><th>Actions</th></tr></thead><tbody>';
   list.forEach(function(r){
     var dl=daysLeft(r.expire_le);
@@ -517,8 +519,11 @@ function renderTable(){
 
 function rowByCle(cle){ for(var i=0;i<ROWS.length;i++){ if(ROWS[i].cle===cle) return ROWS[i]; } return null; }
 
+var ACTING=false;
 async function doAction(act,cle){
+  if(ACTING) return;               // évite les doubles clics (ex. double renouvellement)
   var r=rowByCle(cle); if(!r) return;
+  ACTING=true;
   try{
     if(act==="renew"){
       var base=(r.expire_le && r.expire_le>today())?r.expire_le:today();
@@ -548,6 +553,7 @@ async function doAction(act,cle){
     }
     await loadList();
   }catch(e){ toast("Erreur : "+e.message,"bad"); }
+  finally{ ACTING=false; }
 }
 
 async function createClient(){
@@ -633,6 +639,9 @@ $("tableWrap").addEventListener("click",function(e){
 $("editSave").onclick=saveEdit;
 $("editCancel").onclick=closeEdit;
 $("editClose").onclick=closeEdit;
+$("eCle").onclick=function(){ if(this.textContent) copy(this.textContent); };
+// Entrée dans un champ = Enregistrer (raccourci pratique)
+$("editScrim").addEventListener("keydown",function(e){ if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); saveEdit(); } });
 // Volontairement : un clic à côté (sur le fond) NE ferme PAS la modale,
 // pour ne pas perdre la saisie. On ferme uniquement via ×, Annuler ou Échap.
 document.addEventListener("keydown",function(e){ if(e.key==="Escape" && $("editScrim").classList.contains("show")) closeEdit(); });
