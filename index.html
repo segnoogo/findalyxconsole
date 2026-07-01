@@ -144,6 +144,9 @@ input:focus{outline:none;border-color:var(--blue-soft);box-shadow:0 0 0 4px var(
 table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:720px}
 thead th{position:sticky;top:0;background:#f7f9fd;z-index:1}
 th{text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;padding:11px 14px;border-bottom:1px solid var(--line)}
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--navy)}
+th.sortable .ar{color:var(--orange);font-size:9px;margin-left:3px}
 td{padding:11px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
 tbody tr{transition:background .12s}
 tbody tr:last-child td{border-bottom:none}
@@ -298,6 +301,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
               <option value="susp">Suspendues</option>
             </select>
             <button id="newBtn" class="btn primary" data-view="create">+ Nouveau client</button>
+            <button id="exportBtn" class="btn" title="Exporter la liste affichée en CSV">Exporter CSV</button>
             <button id="refreshBtn" class="btn">Actualiser</button>
           </div>
           <div id="tableWrap"><div class="empty">Chargement&hellip;</div></div>
@@ -314,7 +318,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
 <div id="editScrim" class="modal-scrim">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
     <div class="modal-head">
-      <h2 id="editTitle">Modifier le client</h2>
+      <h2 id="editTitle">Fiche client</h2>
       <button class="modal-close" id="editClose" aria-label="Fermer">&times;</button>
     </div>
     <div class="modal-body">
@@ -475,6 +479,20 @@ function renderDashboard(){
 
 function initials(r){ var a=(r.prenom||"").trim(), b=(r.nom||"").trim(); var s=((a?a[0]:"")+(b?b[0]:"")).toUpperCase(); if(!s){ var c=String(r.client||r.entreprise||"?").trim(); s=c?c[0].toUpperCase():"?"; } return s||"?"; }
 function fullName(r){ var n=((r.prenom||"")+" "+(r.nom||"")).trim(); return n||r.client||"—"; }
+
+// Tri du tableau
+var SORT={key:null,dir:1}, VIEW_ROWS=[];
+function sortVal(r,key){
+  switch(key){
+    case "client": return fullName(r).toLowerCase();
+    case "code": return String(r.cle||"").toLowerCase();
+    case "statut": return ({ok:0,soon:1,exp:2,susp:3})[licStatus(r).key];
+    case "jours": var dl=daysLeft(r.expire_le); return dl==null?1e9:dl;
+    case "appareils": return Array.isArray(r.appareils)?r.appareils.length:0;
+    case "societes": return r.societes_utilisees!=null?r.societes_utilisees:0;
+  }
+  return "";
+}
 function renderTable(){
   var q=($("search").value||"").toLowerCase().trim();
   var ft=($("filterType")&&$("filterType").value)||"all";
@@ -483,10 +501,19 @@ function renderTable(){
     if(!q) return true;
     return (String(r.prenom||"")+" "+String(r.nom||"")+" "+String(r.entreprise||"")+" "+String(r.email||"")+" "+String(r.client||"")+" "+String(r.cle||"")).toLowerCase().indexOf(q)>=0;
   });
+  if(SORT.key){ list.sort(function(a,b){ var va=sortVal(a,SORT.key), vb=sortVal(b,SORT.key); if(va<vb) return -SORT.dir; if(va>vb) return SORT.dir; return 0; }); }
+  VIEW_ROWS=list;
   var filtered=(q||ft!=="all");
   var lc=$("licCnt"); if(lc) lc.textContent=filtered?(list.length+" / "+ROWS.length):ROWS.length;
   if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+(filtered?" pour ce filtre":"")+'.</div>'; return; }
-  var h='<table><thead><tr><th>Client</th><th>Code</th><th>Statut</th><th>Jours</th><th>Appareils</th><th>Sociétés</th><th>Actions</th></tr></thead><tbody>';
+  var cols=[["client","Client"],["code","Code"],["statut","Statut"],["jours","Jours"],["appareils","Appareils"],["societes","Sociétés"]];
+  var thead="";
+  cols.forEach(function(c){
+    var ar=(SORT.key===c[0])?'<span class="ar">'+(SORT.dir>0?"▲":"▼")+'</span>':"";
+    thead+='<th class="sortable" data-sort="'+c[0]+'" title="Trier">'+c[1]+ar+'</th>';
+  });
+  thead+='<th>Actions</th>';
+  var h='<table><thead><tr>'+thead+'</tr></thead><tbody>';
   list.forEach(function(r){
     var dl=daysLeft(r.expire_le);
     var st, cls;
@@ -622,14 +649,44 @@ function copy(txt){
 }
 function fallbackCopy(txt){ var i=document.createElement("input"); i.value=txt; document.body.appendChild(i); i.select(); try{ document.execCommand("copy"); toast("Code copié : "+txt,"ok"); }catch(e){ toast(txt); } document.body.removeChild(i); }
 
+// --- Export CSV (liste actuellement affichée : filtre + recherche + tri) ---
+function csvCell(v){ v=String(v==null?"":v); return /[";\n\r]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; }
+function exportCSV(){
+  var rows=VIEW_ROWS||[];
+  if(!rows.length){ toast("Rien à exporter","bad"); return; }
+  var head=["Prénom","Nom","Entreprise","Email","Téléphone","Code","Statut","Expire le","Jours restants","Appareils utilisés","Appareils max","Sociétés utilisées","Sociétés max"];
+  var lib={ok:"Actif",soon:"Expire bientôt",exp:"Expiré",susp:"Suspendu"};
+  var lines=[head.map(csvCell).join(";")];
+  rows.forEach(function(r){
+    var dl=daysLeft(r.expire_le);
+    lines.push([
+      r.prenom, r.nom, r.entreprise, r.email, r.contact, r.cle,
+      (lib[licStatus(r).key]||""), r.expire_le, (dl==null?"":dl),
+      (Array.isArray(r.appareils)?r.appareils.length:0), (r.max_appareils!=null?r.max_appareils:2),
+      (r.societes_utilisees!=null?r.societes_utilisees:0), (r.max_societes!=null?r.max_societes:1)
+    ].map(csvCell).join(";"));
+  });
+  var csv="﻿"+lines.join("\r\n");   // BOM pour les accents dans Excel
+  try{
+    var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a"); a.href=url; a.download="licences-findalyx-"+today()+".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+    toast("Export CSV : "+rows.length+" ligne"+(rows.length>1?"s":""),"ok");
+  }catch(e){ toast("Export impossible : "+e.message,"bad"); }
+}
+
 $("connBtn").onclick=connect;
 $("cPass").addEventListener("keydown",function(e){ if(e.key==="Enter") connect(); });
 $("createBtn").onclick=createClient;
 $("refreshBtn").onclick=loadList;
+$("exportBtn").onclick=exportCSV;
 
 $("search").addEventListener("input",function(){ var lv=document.getElementById("view-licences"); if(lv&&lv.hidden){ switchView("licences"); } renderTable(); });
 $("filterType").addEventListener("change",renderTable);
 $("tableWrap").addEventListener("click",function(e){
+  var so=e.target.closest("[data-sort]"); if(so){ var k=so.getAttribute("data-sort"); if(SORT.key===k){ SORT.dir=-SORT.dir; } else { SORT.key=k; SORT.dir=1; } renderTable(); return; }
   var c=e.target.closest("[data-copy]"); if(c){ copy(c.getAttribute("data-copy")); return; }
   var ed=e.target.closest("[data-edit]"); if(ed){ openEdit(ed.getAttribute("data-edit")); return; }
   var b=e.target.closest("[data-act]"); if(b){ doAction(b.getAttribute("data-act"), b.getAttribute("data-cle")); }
