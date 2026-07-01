@@ -190,6 +190,7 @@ td.em a:hover{text-decoration:underline}
 select{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;color:var(--ink);background:#fff;transition:border-color .15s,box-shadow .15s}
 select:hover{border-color:#cdd7e8}
 select:focus{outline:none;border-color:var(--blue-soft);box-shadow:0 0 0 4px var(--ring)}
+select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:600;color:var(--navy);border-radius:8px;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
 
 /* ---------- Responsive ---------- */
 @media(max-width:900px){
@@ -289,7 +290,14 @@ select:focus{outline:none;border-color:var(--blue-soft);box-shadow:0 0 0 4px var
           <div class="tbar">
             <h2>Licences g&eacute;n&eacute;r&eacute;es</h2>
             <span class="cnt" id="licCnt"></span>
-            <button id="newBtn" class="btn primary" data-view="create" style="margin-left:auto">+ Nouveau client</button>
+            <select id="filterType" class="filter" title="Filtrer par statut" style="margin-left:auto">
+              <option value="all">Tous les statuts</option>
+              <option value="ok">Actives</option>
+              <option value="soon">Expire bient&ocirc;t (&lt; 30 j)</option>
+              <option value="exp">Expir&eacute;es</option>
+              <option value="susp">Suspendues</option>
+            </select>
+            <button id="newBtn" class="btn primary" data-view="create">+ Nouveau client</button>
             <button id="refreshBtn" class="btn">Actualiser</button>
           </div>
           <div id="tableWrap"><div class="empty">Chargement&hellip;</div></div>
@@ -469,8 +477,13 @@ function initials(r){ var a=(r.prenom||"").trim(), b=(r.nom||"").trim(); var s=(
 function fullName(r){ var n=((r.prenom||"")+" "+(r.nom||"")).trim(); return n||r.client||"—"; }
 function renderTable(){
   var q=($("search").value||"").toLowerCase().trim();
-  var list=ROWS.filter(function(r){ if(!q) return true; return (String(r.prenom||"")+" "+String(r.nom||"")+" "+String(r.entreprise||"")+" "+String(r.email||"")+" "+String(r.client||"")+" "+String(r.cle||"")).toLowerCase().indexOf(q)>=0; });
-  if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+(q?" pour cette recherche":"")+'.</div>'; return; }
+  var ft=($("filterType")&&$("filterType").value)||"all";
+  var list=ROWS.filter(function(r){
+    if(ft!=="all" && licStatus(r).key!==ft) return false;
+    if(!q) return true;
+    return (String(r.prenom||"")+" "+String(r.nom||"")+" "+String(r.entreprise||"")+" "+String(r.email||"")+" "+String(r.client||"")+" "+String(r.cle||"")).toLowerCase().indexOf(q)>=0;
+  });
+  if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+((q||ft!=="all")?" pour ce filtre":"")+'.</div>'; return; }
   var h='<table><thead><tr><th>Client</th><th>Code</th><th>Statut</th><th>Jours</th><th>Appareils</th><th>Sociétés</th><th>Actions</th></tr></thead><tbody>';
   list.forEach(function(r){
     var dl=daysLeft(r.expire_le);
@@ -609,6 +622,7 @@ $("createBtn").onclick=createClient;
 $("refreshBtn").onclick=loadList;
 
 $("search").addEventListener("input",function(){ var lv=document.getElementById("view-licences"); if(lv&&lv.hidden){ switchView("licences"); } renderTable(); });
+$("filterType").addEventListener("change",renderTable);
 $("tableWrap").addEventListener("click",function(e){
   var c=e.target.closest("[data-copy]"); if(c){ copy(c.getAttribute("data-copy")); return; }
   var ed=e.target.closest("[data-edit]"); if(ed){ openEdit(ed.getAttribute("data-edit")); return; }
