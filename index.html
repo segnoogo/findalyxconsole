@@ -289,6 +289,10 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
             <div><label>Date d'expiration</label><input id="nExp" type="date"></div>
             <div><label>Appareils autoris&eacute;s</label><input id="nMax" type="number" value="2" min="1"></div>
             <div><label>Soci&eacute;t&eacute;s autoris&eacute;es</label><input id="nSoc" type="number" value="1" min="0" title="0 = illimit&eacute;"></div>
+            <div><label>Produit</label><select id="nProduit">
+              <option value="liasse">Liasse fiscale</option>
+              <option value="conseil">Conseil financier</option>
+              <option value="tous">Les deux (bundle)</option></select></div>
           </div>
           <div class="row"><button id="createBtn" class="btn primary">Cr&eacute;er le code</button></div>
           <div id="createOut"></div>
@@ -338,6 +342,10 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
         <div><label>Date d'expiration</label><input id="eExp" type="date"></div>
         <div><label>Appareils autoris&eacute;s</label><input id="eMax" type="number" min="1"></div>
         <div><label>Soci&eacute;t&eacute;s autoris&eacute;es</label><input id="eSoc" type="number" min="0" title="0 = illimit&eacute;"></div>
+        <div><label>Produit</label><select id="eProduit">
+          <option value="liasse">Liasse fiscale</option>
+          <option value="conseil">Conseil financier</option>
+          <option value="tous">Les deux (bundle)</option></select></div>
         <div><label>Statut</label><select id="eStatut"><option value="actif">Actif</option><option value="resilie">Suspendu</option></select></div>
       </div>
       <p class="hint">Code de licence : <span id="eCle" class="code" title="Cliquer pour copier"></span></p>
@@ -497,6 +505,7 @@ function sortVal(r,key){
   switch(key){
     case "client": return fullName(r).toLowerCase();
     case "code": return String(r.cle||"").toLowerCase();
+    case "produit": return String(r.produit||"liasse");
     case "statut": return ({ok:0,soon:1,exp:2,susp:3})[licStatus(r).key];
     case "jours": var dl=daysLeft(r.expire_le); return dl==null?1e9:dl;
     case "appareils": return Array.isArray(r.appareils)?r.appareils.length:0;
@@ -510,14 +519,14 @@ function renderTable(){
   var list=ROWS.filter(function(r){
     if(ft!=="all" && licStatus(r).key!==ft) return false;
     if(!q) return true;
-    return (String(r.prenom||"")+" "+String(r.nom||"")+" "+String(r.entreprise||"")+" "+String(r.email||"")+" "+String(r.client||"")+" "+String(r.cle||"")).toLowerCase().indexOf(q)>=0;
+    return (String(r.prenom||"")+" "+String(r.nom||"")+" "+String(r.entreprise||"")+" "+String(r.email||"")+" "+String(r.client||"")+" "+String(r.cle||"")+" "+String(r.produit||"liasse")).toLowerCase().indexOf(q)>=0;
   });
   if(SORT.key){ list.sort(function(a,b){ var va=sortVal(a,SORT.key), vb=sortVal(b,SORT.key); if(va<vb) return -SORT.dir; if(va>vb) return SORT.dir; return 0; }); }
   VIEW_ROWS=list;
   var filtered=(q||ft!=="all");
   var lc=$("licCnt"); if(lc) lc.textContent=filtered?(list.length+" / "+ROWS.length):ROWS.length;
   if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+(filtered?" pour ce filtre":"")+'.</div>'; return; }
-  var cols=[["client","Client"],["code","Code"],["statut","Statut"],["jours","Jours"],["appareils","Appareils"],["societes","Sociétés"]];
+  var cols=[["client","Client"],["code","Code"],["produit","Produit"],["statut","Statut"],["jours","Jours"],["appareils","Appareils"],["societes","Sociétés"]];
   var thead="";
   cols.forEach(function(c){
     var ar=(SORT.key===c[0])?'<span class="ar">'+(SORT.dir>0?"▲":"▼")+'</span>':"";
@@ -537,6 +546,7 @@ function renderTable(){
     h+='<tr>'+
       '<td><div class="who editable" data-edit="'+esc(r.cle)+'" title="Cliquer pour voir / modifier ce client"><span class="ava">'+esc(initials(r))+'</span><span class="cli">'+esc(fullName(r))+'</span></div></td>'+
       '<td><span class="code" data-copy="'+esc(r.cle)+'" title="Cliquer pour copier">'+esc(r.cle)+'</span></td>'+
+      '<td>'+({liasse:'<span class="pill" style="background:#e5ebf6;color:#224289">Liasse</span>',conseil:'<span class="pill" style="background:#fdeee2;color:#c2410c">Conseil</span>',tous:'<span class="pill" style="background:#e7f6ee;color:#16904e">Bundle</span>'}[r.produit||"liasse"]||esc(r.produit))+'</td>'+
       '<td><span class="pill '+cls+'">'+st+'</span></td>'+
       '<td title="'+esc(r.expire_le?("Expire le "+r.expire_le):"")+'">'+(dl==null?"—":(dl<0?"expiré":dl+" j"))+'</td>'+
       '<td>'+nb+' / '+(r.max_appareils!=null?r.max_appareils:2)+'</td>'+
@@ -603,7 +613,7 @@ async function createClient(){
   var client=entreprise||((prenom+" "+nom).trim());
   $("createBtn").disabled=true;
   try{
-    var row=await api("create",{client:client, prenom:prenom, nom:nom, email:email, entreprise:entreprise, contact:contact, expire_le:exp, max_appareils:max, max_societes:soc});
+    var row=await api("create",{client:client, prenom:prenom, nom:nom, email:email, entreprise:entreprise, contact:contact, expire_le:exp, max_appareils:max, max_societes:soc, produit:($("nProduit")?$("nProduit").value:"liasse")});
     var code=row&&row.cle?row.cle:"(voir la liste)";
     $("createOut").innerHTML='<div class="newcode">Code créé pour <b>'+esc(client)+'</b> :<br><span class="big">'+esc(code)+'</span> '+
       '<button class="btn mini" id="copyNew">Copier</button><div class="hint">Remets ce code au client. Il l\'entrera à l\'ouverture de l\'application.</div></div>';
@@ -627,6 +637,7 @@ function openEdit(cle){
   $("eContact").value=r.contact||"";
   $("eExp").value=r.expire_le||"";
   $("eMax").value=(r.max_appareils!=null?r.max_appareils:2);
+  if($("eProduit")) $("eProduit").value=(r.produit||"liasse");
   $("eSoc").value=(r.max_societes!=null?r.max_societes:1);
   $("eStatut").value=(r.statut==="actif"?"actif":"resilie");
   $("eCle").textContent=cle;
@@ -671,7 +682,7 @@ async function saveEdit(){
   var client=entreprise||((prenom+" "+nom).trim());
   $("editSave").disabled=true;
   try{
-    await api("update",{cle:EDIT_CLE, client:client, prenom:prenom, nom:nom, email:email, entreprise:entreprise, contact:contact, expire_le:exp, max_appareils:max, max_societes:soc, statut:statut});
+    await api("update",{cle:EDIT_CLE, client:client, prenom:prenom, nom:nom, email:email, entreprise:entreprise, contact:contact, expire_le:exp, max_appareils:max, max_societes:soc, statut:statut, produit:($("eProduit")?$("eProduit").value:"liasse")});
     toast("Client mis à jour","ok");
     closeEdit();
     await loadList();
