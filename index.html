@@ -304,7 +304,13 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
           <div class="tbar">
             <h2>Licences g&eacute;n&eacute;r&eacute;es</h2>
             <span class="cnt" id="licCnt"></span>
-            <select id="filterType" class="filter" title="Filtrer par statut" style="margin-left:auto">
+            <select id="filterProduit" class="filter" title="Filtrer par produit" style="margin-left:auto">
+              <option value="all">Tous les produits</option>
+              <option value="liasse">Liasse fiscale</option>
+              <option value="conseil">Conseil financier</option>
+              <option value="tous">Bundle (les deux)</option>
+            </select>
+            <select id="filterType" class="filter" title="Filtrer par statut">
               <option value="all">Tous les statuts</option>
               <option value="ok">Actives</option>
               <option value="soon">Expire bient&ocirc;t (&lt; 30 j)</option>
@@ -518,12 +524,14 @@ function renderTable(){
   var ft=($("filterType")&&$("filterType").value)||"all";
   var list=ROWS.filter(function(r){
     if(ft!=="all" && licStatus(r).key!==ft) return false;
+    var fp=($("filterProduit")&&$("filterProduit").value)||"all";
+    if(fp!=="all" && String(r.produit||"liasse")!==fp) return false;
     if(!q) return true;
     return (String(r.prenom||"")+" "+String(r.nom||"")+" "+String(r.entreprise||"")+" "+String(r.email||"")+" "+String(r.client||"")+" "+String(r.cle||"")+" "+String(r.produit||"liasse")).toLowerCase().indexOf(q)>=0;
   });
   if(SORT.key){ list.sort(function(a,b){ var va=sortVal(a,SORT.key), vb=sortVal(b,SORT.key); if(va<vb) return -SORT.dir; if(va>vb) return SORT.dir; return 0; }); }
   VIEW_ROWS=list;
-  var filtered=(q||ft!=="all");
+  var filtered=(q||ft!=="all"||(($("filterProduit")&&$("filterProduit").value)||"all")!=="all");
   var lc=$("licCnt"); if(lc) lc.textContent=filtered?(list.length+" / "+ROWS.length):ROWS.length;
   if(!list.length){ $("tableWrap").innerHTML='<div class="empty">Aucune licence'+(filtered?" pour ce filtre":"")+'.</div>'; return; }
   var cols=[["client","Client"],["code","Code"],["produit","Produit"],["statut","Statut"],["jours","Jours"],["appareils","Appareils"],["societes","Sociétés"]];
@@ -732,6 +740,7 @@ $("exportBtn").onclick=exportCSV;
 
 $("search").addEventListener("input",function(){ var lv=document.getElementById("view-licences"); if(lv&&lv.hidden){ switchView("licences"); } renderTable(); });
 $("filterType").addEventListener("change",renderTable);
+$("filterProduit").addEventListener("change",renderTable);
 $("tableWrap").addEventListener("click",function(e){
   var so=e.target.closest("[data-sort]"); if(so){ var k=so.getAttribute("data-sort"); if(SORT.key===k){ SORT.dir=-SORT.dir; } else { SORT.key=k; SORT.dir=1; } renderTable(); return; }
   var c=e.target.closest("[data-copy]"); if(c){ copy(c.getAttribute("data-copy")); return; }
