@@ -1059,23 +1059,43 @@ function ensureXLSX(){
     document.head.appendChild(s);
   });
 }
+var BENCH_SECTEURS=["Agro-industrie","Industrie manufacturière","Commerce & distribution","Services & conseil","Général"];
 async function benchDownloadTemplate(){
   try{ await ensureXLSX(); }catch(e){ toast(e.message,"bad"); return; }
+  // Onglet 1 « benchmark » : en-têtes en ligne 1, exemple en ligne 2 (alignés).
   var ex=["EXEMPLE (à supprimer)","Agro-industrie",2025,"brvm",340831,"",49672,38134,24972,225843,137937,35599,101615,36225,68480,"","",668,3484];
   var ws=XLSX.utils.aoa_to_sheet([BENCH_COLS, ex]);
-  ws["!cols"]=BENCH_COLS.map(function(){ return {wch:16}; });
+  ws["!cols"]=BENCH_COLS.map(function(c){ return {wch:(c==="nom"||c==="secteur")?24:14}; });
+  // Onglet 2 « Mode d'emploi » : unité + secteurs valides (le .xlsx gratuit ne gère pas les vraies listes déroulantes).
+  var notice=[
+    ["MODE D'EMPLOI — modèle d'import du benchmark"],[""],
+    ["• Tous les montants sont en MILLIONS de FCFA (ex. ca = 340831 = 340,8 milliards)."],
+    ["• Une ligne par société dans l'onglet « benchmark »."],
+    ["• Cellule vide = donnée manquante (laisser vide, ne pas mettre 0)."],
+    ["• Supprimez la ligne EXEMPLE avant d'importer."],
+    ["• Ne renommez pas les en-têtes ; l'ordre des colonnes peut changer."],
+    [""],["Secteurs valides (à recopier exactement dans la colonne « secteur ») :"]
+  ].concat(BENCH_SECTEURS.map(function(s){ return ["   - "+s]; }));
+  var wsN=XLSX.utils.aoa_to_sheet(notice); wsN["!cols"]=[{wch:72}];
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "benchmark");
+  XLSX.utils.book_append_sheet(wb, wsN, "Mode d'emploi");
   XLSX.writeFile(wb, "modele_benchmark.xlsx");
-  toast("Modèle téléchargé — une ligne par société, supprimez la ligne EXEMPLE, puis « Importer Excel ».","ok");
+  toast("Modèle téléchargé — remplir l'onglet « benchmark » en MILLIONS FCFA (voir l'onglet « Mode d'emploi »).","ok");
 }
 function benchRowsFromAoa(arr){
   var rows=[], errors=[];
   if(!arr||!arr.length) return {rows:rows, errors:["Fichier vide."]};
-  var header=(arr[0]||[]).map(function(h){ return String(h==null?"":h).trim().toLowerCase(); });
+  var norm=function(h){ return String(h==null?"":h).normalize("NFD").replace(/[̀-ͯ]/g,"").trim().toLowerCase(); };
+  var hIdx=-1;
+  for(var r=0;r<arr.length;r++){
+    var hs=(arr[r]||[]).map(norm);
+    if(hs.indexOf("nom")>=0 && hs.indexOf("secteur")>=0 && hs.indexOf("annee")>=0){ hIdx=r; break; }
+  }
+  if(hIdx<0) return {rows:rows, errors:["En-têtes introuvables : le fichier doit contenir une ligne avec « nom », « secteur », « annee » (utilisez le modèle)."]};
+  var header=(arr[hIdx]||[]).map(norm);
   var idx={}; BENCH_COLS.forEach(function(c){ idx[c]=header.indexOf(c); });
-  if(idx.nom<0||idx.secteur<0||idx.annee<0) return {rows:rows, errors:["En-têtes manquants : le fichier doit contenir au moins les colonnes « nom », « secteur », « annee » (utilisez le modèle)."]};
-  for(var i=1;i<arr.length;i++){
+  for(var i=hIdx+1;i<arr.length;i++){
     var line=arr[i]; if(!line) continue;
     var nom=String(line[idx.nom]==null?"":line[idx.nom]).trim();
     if(!nom||/^exemple/i.test(nom)) continue;
