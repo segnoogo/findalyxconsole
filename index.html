@@ -898,7 +898,7 @@ async function benchLoadList(){
   var params={};
   var s=$("benchSecteur").value, a=$("benchAnnee").value;
   if(s) params.secteur=s;
-  if(a) params.annee=a;
+  if(a) params.annee=parseInt(a,10);
   try{
     var d=await apiBench("admin_list",params);
     BENCH_ROWS=(d&&d.data)||[];
