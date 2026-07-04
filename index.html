@@ -250,6 +250,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
       <a class="nav-item active" data-view="dash"><span class="ic">&#9636;</span><span>Tableau de bord</span></a>
       <a class="nav-item" data-view="licences"><span class="ic">&#128273;</span><span>Licences</span></a>
       <a class="nav-item" data-view="create"><span class="ic">&#65291;</span><span>Nouveau client</span></a>
+      <a class="nav-item" data-view="benchmark"><span class="ic">&#128202;</span><span>Benchmark</span></a>
     </nav>
     <div class="side-foot">
       <div class="side-user"><span class="ava-mini">A</span><div class="su-txt"><b>Admin</b><small>Findalyx</small></div></div>
@@ -324,6 +325,25 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
           <div id="tableWrap"><div class="empty">Chargement&hellip;</div></div>
         </div>
       </section>
+
+      <section class="view" id="view-benchmark" hidden>
+        <div class="card">
+          <div class="tbar">
+            <h2>Soci&eacute;t&eacute;s du benchmark</h2>
+            <span class="cnt" id="benchCnt"></span>
+            <select id="benchSecteur" class="filter" title="Filtrer par secteur" style="margin-left:auto">
+              <option value="">Tous les secteurs</option>
+            </select>
+            <select id="benchAnnee" class="filter" title="Filtrer par ann&eacute;e">
+              <option value="">Toutes les ann&eacute;es</option>
+            </select>
+            <button id="benchAddBtn" class="btn primary">+ Ajouter une soci&eacute;t&eacute;</button>
+            <button id="benchBulkBtn" class="btn" title="Coller un lot de soci&eacute;t&eacute;s (TSV/CSV)">Coller un lot</button>
+            <button id="benchRefreshBtn" class="btn">Actualiser</button>
+          </div>
+          <div id="benchWrap"><div class="empty">Chargement&hellip;</div></div>
+        </div>
+      </section>
     </div>
   </div>
  </div>
@@ -363,6 +383,66 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
     <div class="modal-foot">
       <button class="btn" id="editCancel">Annuler</button>
       <button class="btn primary" id="editSave">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE SOCIÉTÉ BENCHMARK -->
+<div id="benchScrim" class="modal-scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="benchTitle">
+    <div class="modal-head">
+      <h2 id="benchTitle">Soci&eacute;t&eacute; du benchmark</h2>
+      <button class="modal-close" id="benchClose" aria-label="Fermer">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="formgrid">
+        <div><label>Nom *</label><input id="bNom" placeholder="Ex. SONATEL"></div>
+        <div><label>Secteur *</label><select id="bSecteur"></select></div>
+        <div><label>Ann&eacute;e *</label><input id="bAnnee" type="number" min="1990" max="2100" step="1" placeholder="Ex. 2024"></div>
+        <div><label>Source</label><input id="bSource" placeholder="brvm"></div>
+        <div><label>Chiffre d'affaires (CA)</label><input id="b_ca" type="number" step="any" placeholder="laisser vide = null"></div>
+        <div><label>Marge brute</label><input id="b_marge_brute" type="number" step="any"></div>
+        <div><label>EBITDA</label><input id="b_ebitda" type="number" step="any"></div>
+        <div><label>EBIT</label><input id="b_ebit" type="number" step="any"></div>
+        <div><label>R&eacute;sultat net</label><input id="b_resultat_net" type="number" step="any"></div>
+        <div><label>Total actif</label><input id="b_total_actif" type="number" step="any"></div>
+        <div><label>Capitaux propres</label><input id="b_capitaux_propres" type="number" step="any"></div>
+        <div><label>Dettes financi&egrave;res</label><input id="b_dettes_financieres" type="number" step="any"></div>
+        <div><label>Actif circulant</label><input id="b_actif_circulant" type="number" step="any"></div>
+        <div><label>Passif circulant</label><input id="b_passif_circulant" type="number" step="any"></div>
+        <div><label>Stocks</label><input id="b_stocks" type="number" step="any"></div>
+        <div><label>Cr&eacute;ances clients</label><input id="b_creances_clients" type="number" step="any"></div>
+        <div><label>Dettes fournisseurs</label><input id="b_dettes_fournisseurs" type="number" step="any"></div>
+        <div><label>Tr&eacute;sorerie actif</label><input id="b_tresorerie_actif" type="number" step="any"></div>
+        <div><label>Charges d'int&eacute;r&ecirc;ts</label><input id="b_charges_interets" type="number" step="any"></div>
+      </div>
+      <p class="hint">Les champs num&eacute;riques laiss&eacute;s vides sont enregistr&eacute;s comme <b>null</b>. Le secteur peut &ecirc;tre saisi librement : choisis &laquo;&nbsp;Nouveau secteur&hellip;&nbsp;&raquo; pour en cr&eacute;er un.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="benchCancel">Annuler</button>
+      <button class="btn primary" id="benchSave">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE COLLER UN LOT -->
+<div id="benchBulkScrim" class="modal-scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="benchBulkTitle">
+    <div class="modal-head">
+      <h2 id="benchBulkTitle">Coller un lot de soci&eacute;t&eacute;s</h2>
+      <button class="modal-close" id="benchBulkClose" aria-label="Fermer">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" style="margin-top:6px">Une soci&eacute;t&eacute; par ligne, colonnes s&eacute;par&eacute;es par une <b>tabulation</b> (copier depuis Excel) ou un <b>;</b>. Ordre des colonnes :</p>
+      <p class="hint" style="margin-top:4px"><span class="code" style="cursor:default;white-space:normal;line-height:1.9">nom&#9;secteur&#9;annee&#9;source&#9;ca&#9;marge_brute&#9;ebitda&#9;ebit&#9;resultat_net&#9;total_actif&#9;capitaux_propres&#9;dettes_financieres&#9;actif_circulant&#9;passif_circulant&#9;stocks&#9;creances_clients&#9;dettes_fournisseurs&#9;tresorerie_actif&#9;charges_interets</span></p>
+      <label>Donn&eacute;es coll&eacute;es</label>
+      <textarea id="bulkText" rows="9" placeholder="SONATEL&#9;T&eacute;l&eacute;coms&#9;2024&#9;brvm&#9;1450000&#9;&hellip;" style="width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:13px;font-family:ui-monospace,Consolas,monospace;color:var(--ink);background:#fff;resize:vertical"></textarea>
+      <p class="hint">La 1<sup>re</sup> ligne peut &ecirc;tre un en-t&ecirc;te : si elle commence par &laquo;&nbsp;nom&nbsp;&raquo;, elle est ignor&eacute;e. Le nom, le secteur et l'ann&eacute;e sont obligatoires par ligne.</p>
+      <div id="bulkOut"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="benchBulkCancel">Annuler</button>
+      <button class="btn primary" id="benchBulkSave">Importer le lot</button>
     </div>
   </div>
 </div>
@@ -765,15 +845,241 @@ document.addEventListener("keydown",function(e){ if(e.key==="Escape" && $("editS
 })();
 
 
+/* =====================================================================
+   BENCHMARK — gestion de la table benchmark_companies
+   ===================================================================== */
+var BENCH_URL="https://dddrgmxkywjxxycfoiya.supabase.co/functions/v1/benchmark";
+var BENCH_ROWS=[], BENCH_META={secteurs:[],annees:[]}, BENCH_LOADED=false, BENCH_EDIT_ID=null;
+// Les 15 champs numériques, dans l'ordre (id du champ = "b_"+clé)
+var BENCH_NUM=["ca","marge_brute","ebitda","ebit","resultat_net","total_actif","capitaux_propres","dettes_financieres","actif_circulant","passif_circulant","stocks","creances_clients","dettes_fournisseurs","tresorerie_actif","charges_interets"];
+
+// Appel de la fonction sécurisée benchmark (calqué sur api())
+async function apiBench(op, params){
+  var body=Object.assign({ motdepasse:PASS, op:op }, params||{});
+  var r=await fetch(BENCH_URL,{ method:"POST", headers:{ "Content-Type":"application/json", "apikey":PUBKEY, "Authorization":"Bearer "+PUBKEY }, body:JSON.stringify(body) });
+  var txt=await r.text(); var d=null; try{ d=txt?JSON.parse(txt):null; }catch(e){}
+  if(!r.ok) throw mkErr((d&&d.raison)||("HTTP "+r.status), d&&d.raison);
+  if(!d) throw mkErr("Réponse vide du serveur");
+  if(d.ok===false) throw mkErr(d.raison==="motdepasse"?"Mot de passe incorrect.":(d.raison||"erreur"), d.raison);
+  return d;   // {ok, secteurs?, annees?, data?}
+}
+
+// Formatage de nombre lisible (espaces comme séparateurs de milliers)
+function benchNum(v){
+  if(v==null||v==="") return '<span class="muted">—</span>';
+  var n=Number(v); if(isNaN(n)) return esc(v);
+  try{ return esc(n.toLocaleString("fr-FR")); }catch(e){ return esc(String(n)); }
+}
+
+// Première entrée dans l'onglet : charge méta + liste une seule fois
+function benchEnter(){ if(BENCH_LOADED) return; BENCH_LOADED=true; benchLoadMeta().then(benchLoadList); }
+
+async function benchLoadMeta(){
+  try{
+    var d=await apiBench("admin_meta");
+    BENCH_META.secteurs=(d&&d.secteurs)||[];
+    BENCH_META.annees=(d&&d.annees)||[];
+    benchFillFilters();
+  }catch(e){ toast("Benchmark — méta : "+e.message,"bad"); }
+}
+function benchFillFilters(){
+  var fs=$("benchSecteur"), fa=$("benchAnnee");
+  var curS=fs.value, curA=fa.value;
+  fs.innerHTML='<option value="">Tous les secteurs</option>'+BENCH_META.secteurs.map(function(s){ return '<option value="'+esc(s)+'">'+esc(s)+'</option>'; }).join("");
+  fa.innerHTML='<option value="">Toutes les années</option>'+BENCH_META.annees.map(function(a){ return '<option value="'+esc(a)+'">'+esc(a)+'</option>'; }).join("");
+  fs.value=curS; fa.value=curA;
+}
+
+async function benchLoadList(){
+  $("benchWrap").innerHTML='<div class="empty">Chargement…</div>';
+  var params={};
+  var s=$("benchSecteur").value, a=$("benchAnnee").value;
+  if(s) params.secteur=s;
+  if(a) params.annee=a;
+  try{
+    var d=await apiBench("admin_list",params);
+    BENCH_ROWS=(d&&d.data)||[];
+    benchRenderTable();
+  }catch(e){
+    $("benchWrap").innerHTML='<div class="empty">Erreur : '+esc(e.message)+'</div>';
+    toast("Erreur : "+e.message,"bad");
+  }
+}
+
+function benchRenderTable(){
+  var lc=$("benchCnt"); if(lc) lc.textContent=BENCH_ROWS.length;
+  if(!BENCH_ROWS.length){ $("benchWrap").innerHTML='<div class="empty">Aucune société'+(($("benchSecteur").value||$("benchAnnee").value)?" pour ce filtre":"")+'.</div>'; return; }
+  var h='<table><thead><tr>'+
+    '<th>Nom</th><th>Secteur</th><th>Année</th><th>Source</th>'+
+    '<th>CA</th><th>EBITDA</th><th>Résultat net</th><th>Total actif</th>'+
+    '<th>Actions</th></tr></thead><tbody>';
+  BENCH_ROWS.forEach(function(r){
+    h+='<tr>'+
+      '<td><span class="cli">'+esc(r.nom||"—")+'</span></td>'+
+      '<td>'+esc(r.secteur||"—")+'</td>'+
+      '<td>'+esc(r.annee!=null?r.annee:"—")+'</td>'+
+      '<td>'+(r.source?'<span class="pill" style="background:#e5ebf6;color:#224289">'+esc(r.source)+'</span>':'<span class="muted">—</span>')+'</td>'+
+      '<td>'+benchNum(r.ca)+'</td>'+
+      '<td>'+benchNum(r.ebitda)+'</td>'+
+      '<td>'+benchNum(r.resultat_net)+'</td>'+
+      '<td>'+benchNum(r.total_actif)+'</td>'+
+      '<td><div class="acts">'+
+        '<button class="btn mini" data-bact="edit" data-id="'+esc(r.id)+'">Modifier</button>'+
+        '<button class="iconbtn danger" data-bact="del" data-id="'+esc(r.id)+'" title="Supprimer">🗑</button>'+
+      '</div></td></tr>';
+  });
+  h+='</tbody></table>';
+  $("benchWrap").innerHTML=h;
+}
+
+function benchRowById(id){ for(var i=0;i<BENCH_ROWS.length;i++){ if(String(BENCH_ROWS[i].id)===String(id)) return BENCH_ROWS[i]; } return null; }
+
+// Remplit le select secteur de la modale (secteurs connus + valeur courante + "nouveau")
+function benchFillSecteurSelect(current){
+  var sel=$("bSecteur");
+  var opts=BENCH_META.secteurs.slice();
+  if(current && opts.indexOf(current)<0) opts.unshift(current);
+  sel.innerHTML=opts.map(function(s){ return '<option value="'+esc(s)+'">'+esc(s)+'</option>'; }).join("")+'<option value="__new__">Nouveau secteur…</option>';
+  sel.value=(current!=null?current:(opts[0]||"__new__"));
+}
+
+function benchOpenModal(id){
+  BENCH_EDIT_ID=id||null;
+  var r=id?benchRowById(id):null;
+  $("benchTitle").textContent=r?"Modifier la société":"Ajouter une société";
+  $("bNom").value=r?(r.nom||""):"";
+  benchFillSecteurSelect(r?r.secteur:(BENCH_META.secteurs[0]||null));
+  $("bAnnee").value=(r&&r.annee!=null)?r.annee:"";
+  $("bSource").value=r?(r.source||"brvm"):"brvm";
+  BENCH_NUM.forEach(function(k){ var el=$("b_"+k); if(el) el.value=(r&&r[k]!=null)?r[k]:""; });
+  $("benchScrim").classList.add("show");
+  try{ $("bNom").focus(); }catch(e){}
+}
+function benchCloseModal(){ $("benchScrim").classList.remove("show"); BENCH_EDIT_ID=null; }
+
+// Construit l'objet row à partir de la modale (null si champ num vide)
+function benchCollectRow(){
+  var secteur=$("bSecteur").value;
+  if(secteur==="__new__"){ secteur=(prompt("Nom du nouveau secteur :","")||"").trim(); }
+  var row={
+    nom:$("bNom").value.trim(),
+    secteur:secteur,
+    annee:parseInt($("bAnnee").value,10),
+    source:($("bSource").value.trim()||"brvm")
+  };
+  if(BENCH_EDIT_ID!=null) row.id=BENCH_EDIT_ID;
+  BENCH_NUM.forEach(function(k){
+    var v=$("b_"+k).value.trim();
+    row[k]=(v==="")?null:Number(v);
+  });
+  return row;
+}
+
+async function benchSave(){
+  var row=benchCollectRow();
+  if(!row.nom){ toast("Indique le nom de la société","bad"); return; }
+  if(!row.secteur){ toast("Indique le secteur","bad"); return; }
+  if(isNaN(row.annee)){ toast("Indique une année valide","bad"); return; }
+  var bad=BENCH_NUM.filter(function(k){ return row[k]!=null && isNaN(row[k]); });
+  if(bad.length){ toast("Valeur numérique invalide : "+bad[0],"bad"); return; }
+  $("benchSave").disabled=true;
+  try{
+    await apiBench("admin_save",{row:row});
+    toast(BENCH_EDIT_ID!=null?"Société mise à jour":"Société ajoutée","ok");
+    benchCloseModal();
+    await benchLoadMeta();        // secteurs/années peuvent avoir changé
+    await benchLoadList();
+  }catch(e){ toast("Erreur : "+e.message,"bad"); }
+  $("benchSave").disabled=false;
+}
+
+async function benchDelete(id){
+  var r=benchRowById(id); if(!r) return;
+  if(!confirm("SUPPRIMER définitivement \""+(r.nom||id)+"\" ("+(r.annee||"?")+") du benchmark ? Action irréversible.")) return;
+  try{
+    await apiBench("admin_delete",{id:id});
+    toast("Société supprimée","ok");
+    await benchLoadMeta();
+    await benchLoadList();
+  }catch(e){ toast("Erreur : "+e.message,"bad"); }
+}
+
+// --- Coller un lot (TSV/CSV) ---
+var BENCH_COLS=["nom","secteur","annee","source"].concat(BENCH_NUM);
+function benchOpenBulk(){ $("bulkText").value=""; $("bulkOut").innerHTML=""; $("benchBulkScrim").classList.add("show"); try{ $("bulkText").focus(); }catch(e){} }
+function benchCloseBulk(){ $("benchBulkScrim").classList.remove("show"); }
+function benchParseBulk(text){
+  var lines=String(text||"").split(/\r?\n/).filter(function(l){ return l.trim()!==""; });
+  if(!lines.length) return {rows:[],errors:[]};
+  // Ignore une ligne d'en-tête éventuelle
+  if(/^\s*nom\b/i.test(lines[0])) lines=lines.slice(1);
+  var rows=[], errors=[];
+  lines.forEach(function(line,idx){
+    var parts=line.split(line.indexOf("\t")>=0?"\t":";").map(function(c){ return c.trim(); });
+    var row={ nom:parts[0]||"", secteur:parts[1]||"", annee:parseInt(parts[2],10), source:(parts[3]||"brvm") };
+    if(!row.nom||!row.secteur||isNaN(row.annee)){ errors.push("Ligne "+(idx+1)+" : nom, secteur et année obligatoires."); return; }
+    for(var j=0;j<BENCH_NUM.length;j++){
+      var raw=parts[4+j];
+      if(raw==null||raw===""){ row[BENCH_NUM[j]]=null; }
+      else { var n=Number(raw.replace(/\s/g,"").replace(",",".")); row[BENCH_NUM[j]]=isNaN(n)?null:n; }
+    }
+    rows.push(row);
+  });
+  return {rows:rows,errors:errors};
+}
+async function benchBulkImport(){
+  var parsed=benchParseBulk($("bulkText").value);
+  if(parsed.errors.length){ $("bulkOut").innerHTML='<p class="hint" style="color:var(--bad)">'+parsed.errors.map(esc).join("<br>")+'</p>'; }
+  if(!parsed.rows.length){ toast("Aucune ligne valide à importer","bad"); return; }
+  $("benchBulkSave").disabled=true;
+  var ok=0, fail=0, msgs=[];
+  for(var i=0;i<parsed.rows.length;i++){
+    try{ await apiBench("admin_save",{row:parsed.rows[i]}); ok++; }
+    catch(e){ fail++; msgs.push("« "+(parsed.rows[i].nom||"?")+" » : "+e.message); }
+  }
+  $("benchBulkSave").disabled=false;
+  toast(ok+" société"+(ok>1?"s":"")+" importée"+(ok>1?"s":"")+(fail?(" — "+fail+" échec"+(fail>1?"s":"")):""), fail?"bad":"ok");
+  if(fail){ $("bulkOut").innerHTML='<p class="hint" style="color:var(--bad)">'+msgs.map(esc).join("<br>")+'</p>'; }
+  await benchLoadMeta();
+  await benchLoadList();
+  if(!fail) benchCloseBulk();
+}
+
+// --- Câblage des événements Benchmark ---
+$("benchSecteur").addEventListener("change",benchLoadList);
+$("benchAnnee").addEventListener("change",benchLoadList);
+$("benchRefreshBtn").onclick=function(){ benchLoadMeta().then(benchLoadList); };
+$("benchAddBtn").onclick=function(){ benchOpenModal(null); };
+$("benchBulkBtn").onclick=benchOpenBulk;
+$("benchWrap").addEventListener("click",function(e){
+  var b=e.target.closest("[data-bact]"); if(!b) return;
+  var act=b.getAttribute("data-bact"), id=b.getAttribute("data-id");
+  if(act==="edit") benchOpenModal(id);
+  else if(act==="del") benchDelete(id);
+});
+$("benchSave").onclick=benchSave;
+$("benchCancel").onclick=benchCloseModal;
+$("benchClose").onclick=benchCloseModal;
+$("benchScrim").addEventListener("keydown",function(e){ if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); benchSave(); } });
+$("benchBulkSave").onclick=benchBulkImport;
+$("benchBulkCancel").onclick=benchCloseBulk;
+$("benchBulkClose").onclick=benchCloseBulk;
+document.addEventListener("keydown",function(e){
+  if(e.key!=="Escape") return;
+  if($("benchScrim").classList.contains("show")) benchCloseModal();
+  else if($("benchBulkScrim").classList.contains("show")) benchCloseBulk();
+});
+
 // --- Navigation entre les vues (onglets) ---
 function switchView(v){
-  ["dash","licences","create"].forEach(function(id){ var s=document.getElementById("view-"+id); if(s) s.hidden=(id!==v); });
+  ["dash","licences","create","benchmark"].forEach(function(id){ var s=document.getElementById("view-"+id); if(s) s.hidden=(id!==v); });
   var items=document.querySelectorAll(".nav-item");
   for(var i=0;i<items.length;i++){ items[i].classList.toggle("active", items[i].getAttribute("data-view")===v); }
-  var titles={dash:"Tableau de bord",licences:"Licences générées",create:"Nouveau client"};
+  var titles={dash:"Tableau de bord",licences:"Licences générées",create:"Nouveau client",benchmark:"Benchmark des sociétés"};
   var t=document.getElementById("viewTitle"); if(t) t.textContent=titles[v]||"";
   document.body.classList.remove("nav-open");
   if(v==="create"){ try{ $("nPrenom").focus(); }catch(e){} }
+  if(v==="benchmark"){ benchEnter(); }
 }
 document.addEventListener("click",function(e){
   var el=e.target.closest("[data-view]"); if(el){ e.preventDefault(); switchView(el.getAttribute("data-view")); }
