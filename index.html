@@ -339,6 +339,9 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
             </select>
             <button id="benchAddBtn" class="btn primary">+ Ajouter une soci&eacute;t&eacute;</button>
             <button id="benchBulkBtn" class="btn" title="Coller un lot de soci&eacute;t&eacute;s (TSV/CSV)">Coller un lot</button>
+            <button id="benchTemplBtn" class="btn" title="T&eacute;l&eacute;charger le mod&egrave;le Excel &agrave; remplir">Mod&egrave;le Excel</button>
+            <button id="benchXlsxBtn" class="btn" title="Importer un fichier Excel rempli">Importer Excel</button>
+            <input type="file" id="benchXlsxFile" accept=".xlsx,.xls,.csv" style="display:none">
             <button id="benchRefreshBtn" class="btn">Actualiser</button>
           </div>
           <div id="benchWrap"><div class="empty">Chargement&hellip;</div></div>
@@ -1045,12 +1048,86 @@ async function benchBulkImport(){
   if(!fail) benchCloseBulk();
 }
 
+// --- Modèle Excel (téléchargement) + import Excel (.xlsx/.csv) ---
+function ensureXLSX(){
+  return new Promise(function(res,rej){
+    if(typeof XLSX!=="undefined") return res();
+    var s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload=function(){ res(); };
+    s.onerror=function(){ rej(new Error("Librairie Excel indisponible (vérifiez la connexion internet).")); };
+    document.head.appendChild(s);
+  });
+}
+async function benchDownloadTemplate(){
+  try{ await ensureXLSX(); }catch(e){ toast(e.message,"bad"); return; }
+  var ex=["EXEMPLE (à supprimer)","Agro-industrie",2025,"brvm",340831,"",49672,38134,24972,225843,137937,35599,101615,36225,68480,"","",668,3484];
+  var ws=XLSX.utils.aoa_to_sheet([BENCH_COLS, ex]);
+  ws["!cols"]=BENCH_COLS.map(function(){ return {wch:16}; });
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "benchmark");
+  XLSX.writeFile(wb, "modele_benchmark.xlsx");
+  toast("Modèle téléchargé — une ligne par société, supprimez la ligne EXEMPLE, puis « Importer Excel ».","ok");
+}
+function benchRowsFromAoa(arr){
+  var rows=[], errors=[];
+  if(!arr||!arr.length) return {rows:rows, errors:["Fichier vide."]};
+  var header=(arr[0]||[]).map(function(h){ return String(h==null?"":h).trim().toLowerCase(); });
+  var idx={}; BENCH_COLS.forEach(function(c){ idx[c]=header.indexOf(c); });
+  if(idx.nom<0||idx.secteur<0||idx.annee<0) return {rows:rows, errors:["En-têtes manquants : le fichier doit contenir au moins les colonnes « nom », « secteur », « annee » (utilisez le modèle)."]};
+  for(var i=1;i<arr.length;i++){
+    var line=arr[i]; if(!line) continue;
+    var nom=String(line[idx.nom]==null?"":line[idx.nom]).trim();
+    if(!nom||/^exemple/i.test(nom)) continue;
+    var secteur=String(line[idx.secteur]==null?"":line[idx.secteur]).trim();
+    var annee=parseInt(line[idx.annee],10);
+    if(!secteur||isNaN(annee)){ errors.push("Ligne "+(i+1)+" (« "+nom+" ») : secteur et année obligatoires."); continue; }
+    var src=(idx.source>=0 && line[idx.source]!=null && String(line[idx.source]).trim())||"brvm";
+    var row={ nom:nom, secteur:secteur, annee:annee, source:src };
+    for(var j=0;j<BENCH_NUM.length;j++){
+      var k=BENCH_NUM[j], ci=idx[k], raw=(ci>=0)?line[ci]:null;
+      if(raw==null||raw===""){ row[k]=null; }
+      else { var n=(typeof raw==="number")?raw:Number(String(raw).replace(/\s/g,"").replace(",",".")); row[k]=isNaN(n)?null:n; }
+    }
+    rows.push(row);
+  }
+  return {rows:rows, errors:errors};
+}
+async function benchImportExcel(file){
+  if(!file) return;
+  try{ await ensureXLSX(); }catch(e){ toast(e.message,"bad"); return; }
+  var reader=new FileReader();
+  reader.onload=async function(ev){
+    var parsed;
+    try{
+      var wb=XLSX.read(ev.target.result,{type:"array"});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var arr=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+      parsed=benchRowsFromAoa(arr);
+    }catch(err){ toast("Lecture Excel impossible : "+err.message,"bad"); return; }
+    if(parsed.errors.length){ toast(parsed.errors[0],"bad"); }
+    if(!parsed.rows.length){ if(!parsed.errors.length) toast("Aucune ligne à importer (avez-vous supprimé la ligne EXEMPLE ?).","bad"); return; }
+    var ok=0, fail=0, msgs=[];
+    for(var i=0;i<parsed.rows.length;i++){
+      try{ await apiBench("admin_save",{row:parsed.rows[i]}); ok++; }
+      catch(e){ fail++; msgs.push("« "+(parsed.rows[i].nom||"?")+" » : "+e.message); }
+    }
+    toast(ok+" société"+(ok>1?"s":"")+" importée"+(ok>1?"s":"")+(fail?(" — "+fail+" échec"+(fail>1?"s":"")):""), fail?"bad":"ok");
+    await benchLoadMeta(); await benchLoadList();
+  };
+  reader.onerror=function(){ toast("Impossible de lire le fichier.","bad"); };
+  reader.readAsArrayBuffer(file);
+}
+
 // --- Câblage des événements Benchmark ---
 $("benchSecteur").addEventListener("change",benchLoadList);
 $("benchAnnee").addEventListener("change",benchLoadList);
 $("benchRefreshBtn").onclick=function(){ benchLoadMeta().then(benchLoadList); };
 $("benchAddBtn").onclick=function(){ benchOpenModal(null); };
 $("benchBulkBtn").onclick=benchOpenBulk;
+$("benchTemplBtn").onclick=benchDownloadTemplate;
+$("benchXlsxBtn").onclick=function(){ $("benchXlsxFile").click(); };
+$("benchXlsxFile").addEventListener("change",function(e){ var f=e.target.files[0]; benchImportExcel(f); e.target.value=""; });
 $("benchWrap").addEventListener("click",function(e){
   var b=e.target.closest("[data-bact]"); if(!b) return;
   var act=b.getAttribute("data-bact"), id=b.getAttribute("data-id");
