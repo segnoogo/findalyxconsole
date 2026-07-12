@@ -293,7 +293,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
             <div><label>Produit</label><select id="nProduit">
               <option value="liasse">Liasse fiscale</option>
               <option value="conseil">Conseil financier</option>
-              <option value="tous">Les deux (bundle)</option></select></div>
+              <option value="telecom">CAR-T&eacute;l&eacute;com (co&ucirc;ts r&eacute;glementaires)</option><option value="tous">Tous (bundle)</option></select></div>
           </div>
           <div class="row"><button id="createBtn" class="btn primary">Cr&eacute;er le code</button></div>
           <div id="createOut"></div>
@@ -309,7 +309,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
               <option value="all">Tous les produits</option>
               <option value="liasse">Liasse fiscale</option>
               <option value="conseil">Conseil financier</option>
-              <option value="tous">Bundle (les deux)</option>
+              <option value="telecom">CAR-T&eacute;l&eacute;com</option><option value="tous">Bundle (tous)</option>
             </select>
             <select id="filterType" class="filter" title="Filtrer par statut">
               <option value="all">Tous les statuts</option>
@@ -374,7 +374,7 @@ select.filter{width:auto;padding:8px 30px 8px 12px;font-size:13px;font-weight:60
         <div><label>Produit</label><select id="eProduit">
           <option value="liasse">Liasse fiscale</option>
           <option value="conseil">Conseil financier</option>
-          <option value="tous">Les deux (bundle)</option></select></div>
+          <option value="telecom">CAR-T&eacute;l&eacute;com (co&ucirc;ts r&eacute;glementaires)</option><option value="tous">Tous (bundle)</option></select></div>
         <div><label>Statut</label><select id="eStatut"><option value="actif">Actif</option><option value="resilie">Suspendu</option></select></div>
       </div>
       <p class="hint">Code de licence : <span id="eCle" class="code" title="Cliquer pour copier"></span></p>
@@ -637,7 +637,7 @@ function renderTable(){
     h+='<tr>'+
       '<td><div class="who editable" data-edit="'+esc(r.cle)+'" title="Cliquer pour voir / modifier ce client"><span class="ava">'+esc(initials(r))+'</span><span class="cli">'+esc(fullName(r))+'</span></div></td>'+
       '<td><span class="code" data-copy="'+esc(r.cle)+'" title="Cliquer pour copier">'+esc(r.cle)+'</span></td>'+
-      '<td>'+({liasse:'<span class="pill" style="background:#e5ebf6;color:#224289">Liasse</span>',conseil:'<span class="pill" style="background:#fdeee2;color:#c2410c">Conseil</span>',tous:'<span class="pill" style="background:#e7f6ee;color:#16904e">Bundle</span>'}[r.produit||"liasse"]||esc(r.produit))+'</td>'+
+      '<td>'+({liasse:'<span class="pill" style="background:#e5ebf6;color:#224289">Liasse</span>',conseil:'<span class="pill" style="background:#fdeee2;color:#c2410c">Conseil</span>',telecom:'<span class="pill" style="background:#e2f2f4;color:#0e7490">T&eacute;l&eacute;com</span>',tous:'<span class="pill" style="background:#e7f6ee;color:#16904e">Bundle</span>'}[r.produit||"liasse"]||esc(r.produit))+'</td>'+
       '<td><span class="pill '+cls+'">'+st+'</span></td>'+
       '<td title="'+esc(r.expire_le?("Expire le "+r.expire_le):"")+'">'+(dl==null?"—":(dl<0?"expiré":dl+" j"))+'</td>'+
       '<td>'+nb+' / '+(r.max_appareils!=null?r.max_appareils:2)+'</td>'+
